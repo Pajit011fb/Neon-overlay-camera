@@ -101,7 +101,7 @@
     </div>
 
     <script>
-        // Access the back camera
+        // Access the camera
         const video = document.getElementById('cameraStream');
         const canvas = document.getElementById('freezeCanvas');
         const ctx = canvas.getContext('2d');
@@ -119,8 +119,8 @@
         const background = document.getElementById('background');
         let cameraFrozen = false;
 
-        // Request back camera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } })
+        // Request camera access
+        navigator.mediaDevices.getUserMedia({ video: true }) // Changed to allow any camera
             .then((stream) => {
                 video.srcObject = stream;
             })
@@ -128,7 +128,7 @@
                 console.error("Error accessing camera: ", error);
             });
 
-        // Function to freeze/unfreeze the camera
+        // Freeze/unfreeze the camera
         freezeBtn.addEventListener('click', () => {
             if (!cameraFrozen) {
                 canvas.width = video.videoWidth;
@@ -163,20 +163,20 @@
             for (let i = 0; i < layers; i++) {
                 const blur = (i + 1) * (spread / layers);
                 const opacity = 1 - (i / layers);
-                shadows.push(0 0 ${blur}px rgba(${hexToRgb(color)}, ${opacity}));
+                shadows.push(`0 0 ${blur}px rgba(${hexToRgb(color)}, ${opacity})`);
             }
 
             neonText.style.color = color;
-            neonText.style.fontSize = ${textSize}px;
+            neonText.style.fontSize = `${textSize}px`;
             neonText.style.textShadow = shadows.join(', ');
-            neonText.style.filter = brightness(${intensity});
+            neonText.style.filter = `brightness(${intensity})`;
 
             // Create the blending effect around the text
             const blendColor = hexToRgb(color);
-            background.style.backgroundImage = radial-gradient(circle at ${neonX}px ${neonY}px, rgba(${blendColor}, 0) ${blend * 10}%, rgba(0, 0, 0, ${darkness / 100}) 100%);
+            background.style.backgroundImage = `radial-gradient(circle at ${neonX}px ${neonY}px, rgba(${blendColor}, 0) ${blend * 10}%, rgba(0, 0, 0, ${darkness / 100}) 100%)`;
             
             // Background darkness for overall dark effect
-            video.style.filter = brightness(${1 - bgDarkness / 100});
+            video.style.filter = `brightness(${1 - bgDarkness / 100})`;
         }
 
         function hexToRgb(hex) {
@@ -186,7 +186,7 @@
                 g = parseInt(hex.slice(3, 5), 16);
                 b = parseInt(hex.slice(5, 7), 16);
             }
-            return ${r}, ${g}, ${b};
+            return `${r}, ${g}, ${b}`;
         }
 
         // Update text content when the user types
@@ -203,11 +203,13 @@
         sizeSlider.addEventListener('input', updateNeonEffect);
         layerSlider.addEventListener('input', updateNeonEffect);
         blendSlider.addEventListener('input', updateNeonEffect);
-                // For dragging functionality
+
+        // For dragging functionality
         let offsetX, offsetY;
         let isDragging = false;
 
         neonText.addEventListener('mousedown', (e) => {
+           
             isDragging = true; // Start dragging
             offsetX = e.clientX - neonText.getBoundingClientRect().left;
             offsetY = e.clientY - neonText.getBoundingClientRect().top;
@@ -216,8 +218,8 @@
 
         document.addEventListener('mousemove', (e) => {
             if (isDragging) {
-                neonText.style.left = ${e.clientX - offsetX}px;
-                neonText.style.top = ${e.clientY - offsetY}px;
+                neonText.style.left = `${e.clientX - offsetX}px`;
+                neonText.style.top = `${e.clientY - offsetY}px`;
                 updateNeonEffect(); // Update effect as the text moves
             }
         });
