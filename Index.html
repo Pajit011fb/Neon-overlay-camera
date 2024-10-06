@@ -26,6 +26,7 @@
             top: 0;
             left: 0;
             z-index: 1;
+            filter: brightness(1); /* Default brightness */
         }
 
         #neonText {
@@ -36,10 +37,13 @@
             color: #0ff;
             z-index: 2;
             cursor: grab;
-            background: rgba(255, 255, 255, 0.2); /* For masking effect */
-            border-radius: 12px; /* Rounded edges */
             padding: 10px;
-            transition: all 0.2s ease; /* Smooth transition for effects */
+            transition: all 0.2s ease;
+            -webkit-text-fill-color: transparent; /* Make text fill transparent */
+            -webkit-background-clip: text; /* Clip background to text */
+            background-clip: text; /* Clip background to text */
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
         }
 
         .controls {
@@ -85,6 +89,12 @@
 
             <label for="sizeSlider">Text Size:</label>
             <input type="range" id="sizeSlider" min="10" max="200" value="48">
+            
+            <label for="layerSlider">Number of Neon Layers:</label>
+            <input type="range" id="layerSlider" min="1" max="20" value="5">
+
+            <label for="blendSlider">Blending / Smudging:</label>
+            <input type="range" id="blendSlider" min="0.1" max="10" step="0.1" value="1">
 
             <button id="freezeBtn">Freeze Camera</button>
         </div>
@@ -103,6 +113,8 @@
         const bgDarknessSlider = document.getElementById('bgDarknessSlider');
         const intensitySlider = document.getElementById('intensitySlider');
         const sizeSlider = document.getElementById('sizeSlider');
+        const layerSlider = document.getElementById('layerSlider');
+        const blendSlider = document.getElementById('blendSlider');
         const freezeBtn = document.getElementById('freezeBtn');
         const background = document.getElementById('background');
         let cameraFrozen = false;
@@ -140,14 +152,17 @@
             const bgDarkness = bgDarknessSlider.value;
             const intensity = intensitySlider.value;
             const textSize = sizeSlider.value;
+            const layers = layerSlider.value;
+            const blend = blendSlider.value;
             const color = neonColor.value;
             const neonX = neonText.getBoundingClientRect().left + (neonText.offsetWidth / 2);
             const neonY = neonText.getBoundingClientRect().top + (neonText.offsetHeight / 2);
 
+            // Create layered text shadow for neon effect
             const shadows = [];
-            for (let i = 1; i <= 10; i++) {
-                const blur = i * (spread / 10);
-                const opacity = 1 - (i / 10);
+            for (let i = 0; i < layers; i++) {
+                const blur = (i + 1) * (spread / layers);
+                const opacity = 1 - (i / layers);
                 shadows.push(`0 0 ${blur}px rgba(${hexToRgb(color)}, ${opacity})`);
             }
 
@@ -156,11 +171,12 @@
             neonText.style.textShadow = shadows.join(', ');
             neonText.style.filter = `brightness(${intensity})`;
 
-            // Radial gradient for neon darkness
-            background.style.backgroundImage = `radial-gradient(circle at ${neonX}px ${neonY}px, rgba(0, 0, 0, ${darkness / 100}) 10%, rgba(0, 0, 0, 0) ${darkness * 2}%)`;
-
+            // Create the blending effect around the text
+            const blendColor = hexToRgb(color);
+            background.style.backgroundImage = `radial-gradient(circle at ${neonX}px ${neonY}px, rgba(${blendColor}, 0) ${blend * 10}%, rgba(0, 0, 0, ${darkness / 100}) 100%)`;
+            
             // Background darkness for overall dark effect
-            background.style.backgroundColor = `rgba(0, 0, 0, ${bgDarkness / 100})`;
+            video.style.filter = `brightness(${1 - bgDarkness / 100})`;
         }
 
         function hexToRgb(hex) {
@@ -176,6 +192,7 @@
         // Update text content when the user types
         neonInput.addEventListener('input', (e) => {
             neonText.textContent = e.target.value;
+            updateNeonEffect(); // Update neon effect when text changes
         });
 
         neonColor.addEventListener('input', updateNeonEffect);
@@ -184,68 +201,33 @@
         bgDarknessSlider.addEventListener('input', updateNeonEffect);
         intensitySlider.addEventListener('input', updateNeonEffect);
         sizeSlider.addEventListener('input', updateNeonEffect);
-        updateNeonEffect();
-
+        layerSlider.addEventListener('input', updateNeonEffect);
+        blendSlider.addEventListener('input', updateNeonEffect);
+        
         // For dragging functionality
         let offsetX, offsetY;
-        neonText.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', null);
-            offsetX = e.clientX - neonText.getBoundingClientRect().left;
+        neonText.addEventListener('mousedown', (e) => {
+                        offsetX = e.clientX - neonText.getBoundingClientRect().left;
             offsetY = e.clientY - neonText.getBoundingClientRect().top;
+            neonText.style.cursor = 'grabbing'; // Change cursor to grabbing
         });
 
-        neonText.addEventListener('drag', (e) => {
-            if (e.clientX !== 0 && e.clientY !== 0) {
+        document.addEventListener('mousemove', (e) => {
+            if (neonText.style.cursor === 'grabbing') {
                 neonText.style.left = `${e.clientX - offsetX}px`;
                 neonText.style.top = `${e.clientY - offsetY}px`;
-                updateNeonEffect();
+                updateNeonEffect(); // Update effect as the text moves
             }
         });
 
-        neonText.addEventListener('dragend', (e) => {
-            neonText.style.left = `${e.clientX - offsetX}px`;
-            neonText.style.top = `${e.clientY - offsetY}px`;
-            updateNeonEffect();
+        document.addEventListener('mouseup', () => {
+            neonText.style.cursor = 'grab'; // Reset cursor
         });
 
-        // For touch-based dragging and pinch-to-zoom
-        let lastTouchDist = 0;
-
-        neonText.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 2) {
-                                lastTouchDist = getTouchDistance(e.touches[0], e.touches[1]);
-            } else {
-                const touch = e.touches[0];
-                offsetX = touch.clientX - neonText.getBoundingClientRect().left;
-                offsetY = touch.clientY - neonText.getBoundingClientRect().top;
-            }
-        });
-
-        neonText.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2) {
-                const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
-                const scale = currentDist / lastTouchDist;
-                neonText.style.transform = `scale(${scale})`;
-            } else if (e.touches.length === 1) {
-                const touch = e.touches[0];
-                neonText.style.left = `${touch.clientX - offsetX}px`;
-                neonText.style.top = `${touch.clientY - offsetY}px`;
-                updateNeonEffect();
-            }
-        });
-
-        neonText.addEventListener('touchend', (e) => {
-            if (e.touches.length === 0) {
-                neonText.style.transform = '';
-            }
-        });
-
-        function getTouchDistance(touch1, touch2) {
-            const dx = touch2.clientX - touch1.clientX;
-            const dy = touch2.clientY - touch1.clientY;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
+        // Set initial effect on load
+        updateNeonEffect();
     </script>
 </body>
 </html>
 
+                
