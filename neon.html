@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera with Neon Text Controls</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            filter: brightness(1); /* Default brightness */
+        }
+
+        #neonText {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            font-size: 48px;
+            color: #0ff;
+            z-index: 2;
+            cursor: grab;
+            padding: 10px;
+            transition: all 0.2s ease;
+            -webkit-text-fill-color: transparent; /* Make text fill transparent */
+            -webkit-background-clip: text; /* Clip background to text */
+            background-clip: text; /* Clip background to text */
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 3;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .controls label, .controls input, .controls button {
+            color: white;
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="background">
+        <video id="cameraStream" autoplay playsinline></video>
+        <canvas id="freezeCanvas" style="display:none;"></canvas>
+        <div id="neonText" class="neon" draggable="true">Drag Me!</div>
+        <div class="controls">
+            <label for="neonInput">Text:</label>
+            <input type="text" id="neonInput" value="Drag Me!">
+            
+            <label for="neonColor">Neon Color:</label>
+            <input type="color" id="neonColor" value="#00ffff">
+            
+            <label for="spreadSlider">Neon Spread:</label>
+            <input type="range" id="spreadSlider" min="0" max="50" value="10">
+            
+            <label for="darknessSlider">Neon Darkness:</label>
+            <input type="range" id="darknessSlider" min="0" max="100" value="20">
+
+            <label for="bgDarknessSlider">Background Darkness:</label>
+            <input type="range" id="bgDarknessSlider" min="0" max="100" value="30">
+
+            <label for="intensitySlider">Glow Intensity:</label>
+            <input type="range" id="intensitySlider" min="0.1" max="3" step="0.1" value="1">
+
+            <label for="sizeSlider">Text Size:</label>
+            <input type="range" id="sizeSlider" min="10" max="200" value="48">
+            
+            <label for="layerSlider">Number of Neon Layers:</label>
+            <input type="range" id="layerSlider" min="1" max="20" value="5">
+
+            <label for="blendSlider">Blending / Smudging:</label>
+            <input type="range" id="blendSlider" min="0.1" max="10" step="0.1" value="1">
+
+            <button id="freezeBtn">Freeze Camera</button>
+        </div>
+    </div>
+
+    <script>
+        // Access the back camera
+        const video = document.getElementById('cameraStream');
+        const canvas = document.getElementById('freezeCanvas');
+        const ctx = canvas.getContext('2d');
+        const neonText = document.getElementById('neonText');
+        const neonInput = document.getElementById('neonInput');
+        const neonColor = document.getElementById('neonColor');
+        const spreadSlider = document.getElementById('spreadSlider');
+        const darknessSlider = document.getElementById('darknessSlider');
+        const bgDarknessSlider = document.getElementById('bgDarknessSlider');
+        const intensitySlider = document.getElementById('intensitySlider');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const layerSlider = document.getElementById('layerSlider');
+        const blendSlider = document.getElementById('blendSlider');
+        const freezeBtn = document.getElementById('freezeBtn');
+        const background = document.getElementById('background');
+        let cameraFrozen = false;
+
+        // Request back camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error("Error accessing camera: ", error);
+            });
+
+        // Function to freeze/unfreeze the camera
+        freezeBtn.addEventListener('click', () => {
+            if (!cameraFrozen) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                video.style.display = 'none';
+                canvas.style.display = 'block';
+                freezeBtn.textContent = 'Unfreeze Camera';
+            } else {
+                video.style.display = 'block';
+                canvas.style.display = 'none';
+                freezeBtn.textContent = 'Freeze Camera';
+            }
+            cameraFrozen = !cameraFrozen;
+        });
+
+        // Function to update neon effect based on sliders and input
+        function updateNeonEffect() {
+            const spread = spreadSlider.value;
+            const darkness = darknessSlider.value;
+            const bgDarkness = bgDarknessSlider.value;
+            const intensity = intensitySlider.value;
+            const textSize = sizeSlider.value;
+            const layers = layerSlider.value;
+            const blend = blendSlider.value;
+            const color = neonColor.value;
+            const neonX = neonText.getBoundingClientRect().left + (neonText.offsetWidth / 2);
+            const neonY = neonText.getBoundingClientRect().top + (neonText.offsetHeight / 2);
+
+            // Create layered text shadow for neon effect
+            const shadows = [];
+            for (let i = 0; i < layers; i++) {
+                const blur = (i + 1) * (spread / layers);
+                const opacity = 1 - (i / layers);
+                shadows.push(`0 0 ${blur}px rgba(${hexToRgb(color)}, ${opacity})`);
+            }
+
+            neonText.style.color = color;
+            neonText.style.fontSize = `${textSize}px`;
+            neonText.style.textShadow = shadows.join(', ');
+            neonText.style.filter = `brightness(${intensity})`;
+
+            // Create the blending effect around the text
+            const blendColor = hexToRgb(color);
+            background.style.backgroundImage = `radial-gradient(circle at ${neonX}px ${neonY}px, rgba(${blendColor}, 0) ${blend * 10}%, rgba(0, 0, 0, ${darkness / 100}) 100%)`;
+            
+            // Background darkness for overall dark effect
+            video.style.filter = `brightness(${1 - bgDarkness / 100})`;
+        }
+
+        function hexToRgb(hex) {
+            let r = 0, g = 0, b = 0;
+            if (hex.length === 7) {
+                r = parseInt(hex.slice(1, 3), 16);
+                g = parseInt(hex.slice(3, 5), 16);
+                b = parseInt(hex.slice(5, 7), 16);
+            }
+            return `${r}, ${g}, ${b}`;
+        }
+
+        // Update text content when the user types
+        neonInput.addEventListener('input', (e) => {
+            neonText.textContent = e.target.value;
+            updateNeonEffect(); // Update neon effect when text changes
+        });
+
+        neonColor.addEventListener('input', updateNeonEffect);
+        spreadSlider.addEventListener('input', updateNeonEffect);
+        darknessSlider.addEventListener('input', updateNeonEffect);
+        bgDarknessSlider.addEventListener('input', updateNeonEffect);
+        intensitySlider.addEventListener('input', updateNeonEffect);
+        sizeSlider.addEventListener('input', updateNeonEffect);
+        layerSlider.addEventListener('input', updateNeonEffect);
+        blendSlider.addEventListener('input', updateNeonEffect);
+        
+        // For dragging functionality
+        let offsetX, offsetY;
+        neonText.addEventListener('mousedown', (e) => {
+            offsetX = e.clientX - neonText.getBoundingClientRect().left;
+                        offsetY = e.clientY - neonText.getBoundingClientRect().top;
+            neonText.style.cursor = 'grabbing'; // Change cursor to grabbing
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (neonText.style.cursor === 'grabbing') {
+                neonText.style.left = `${e.clientX - offsetX}px`;
+                neonText.style.top = `${e.clientY - offsetY}px`;
+                updateNeonEffect(); // Update effect as the text moves
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            neonText.style.cursor = 'grab'; // Reset cursor
+        });
+
+        // Touch support for mobile devices
+        neonText.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            offsetX = touch.clientX - neonText.getBoundingClientRect().left;
+            offsetY = touch.clientY - neonText.getBoundingClientRect().top;
+            neonText.style.cursor = 'grabbing'; // Change cursor to grabbing
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (neonText.style.cursor === 'grabbing') {
+                const touch = e.touches[0];
+                neonText.style.left = `${touch.clientX - offsetX}px`;
+                neonText.style.top = `${touch.clientY - offsetY}px`;
+                updateNeonEffect(); // Update effect as the text moves
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            neonText.style.cursor = 'grab'; // Reset cursor
+        });
+
+        // Set initial effect on load
+        updateNeonEffect();
+    </script>
+</body>
+</html>
+
